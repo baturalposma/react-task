@@ -1,9 +1,14 @@
 import React, { useEffect } from 'react';
-import { Formik, Form, Field, useFormik } from 'formik';
+import { Formik, Form, Field } from 'formik';
 import intlTelInput from 'intl-tel-input';
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom';
+import $ from 'jquery';
 
 const LeadForm = () => {
+  const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  const navigate = useNavigate();
+  const [iti, setIti] = React.useState(null);
+
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const utmSource = urlParams.get('utm_source');
@@ -13,69 +18,75 @@ const LeadForm = () => {
     localStorage.setItem('utmSource', utmSource);
     localStorage.setItem('utmMedium', utmMedium);
     localStorage.setItem('utmTerm', utmTerm);
+
+    const phoneInput = document.querySelector("#phone");
+    const iti = intlTelInput(phoneInput, {
+      initialCountry: "auto",
+      geoIpLookup: function(callback) {
+        $.get("https://ipinfo.io", function() {}, "jsonp").always(function(resp) {
+          var countryCode = (resp && resp.country) ? resp.country : "";
+          callback(countryCode);
+        });
+      },
+      utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/11.0.14/js/utils.js"
+    });
+    setIti(iti);
   }, []);
 
-  const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  const navigate = useNavigate();
-  const formik = useFormik({
-    initialValues: {
-      fullname: '',
-      email: '',
-      phone: ''
-    },
-    validate: values => {
-      const errors = {};
-      if (!values.fullname) {
-        errors.fullname = 'Full name is required';
-      }
-      if (!values.email) {
-        errors.email = 'Email is required';
-      } else if (!emailRegex.test(values.email)) {
-        errors.email = 'Invalid email address';
-      }
-      if (!values.phone) {
-        errors.phone = 'Phone number is required';
-      } else if (!intlTelInput.validate(values.phone)) {
-        errors.phone = 'Invalid phone number';
-      }
-      return errors;
-    },
-    
-    onSubmit: (values, { setSubmitting }) => {
-      // Add logic to submit the form
-      // and navigate to the thank you page
-      setTimeout(() => {
-        setSubmitting(false);
-        navigate('/thank-you')
-      }, 2000);
-    }
-  });
-
   return (
-    <Formik {...formik}>
-      <Form>
-        <div>
-          <Field name="fullname" placeholder="Full Name" />
-          {formik.errors.fullname && formik.touched.fullname && (
-            <div>{formik.errors.fullname}</div>
-          )}
-        </div>
-        <div>
-          <Field name="email" placeholder="Email" type="email" />
-          {formik.errors.email && formik.touched.email && (
-            <div>{formik.errors.email}</div>
-          )}
-        </div>
-        <div>
-          <Field name="phone" placeholder="Phone" type="tel" />
-          {formik.errors.phone && formik.touched.phone && (
-            <div>{formik.errors.phone}</div>
-          )}
-        </div>
-        <button type="submit" disabled={formik.isSubmitting}>
-          Submit
-        </button>
-      </Form>
+    <Formik
+      initialValues={{
+        fullname: '',
+        email: '',
+        phone: ''
+      }}
+      validate={values => {
+        const errors = {};
+        if (!values.fullname) {
+          errors.fullname = 'Full name is required';
+        }
+        if (!values.email) {
+          errors.email = 'Email is required';
+        } else if (!emailRegex.test(values.email)) {
+          errors.email = 'Invalid email address';
+        }
+        if (!values.phone) {
+          errors.phone = 'Phone number is required'
+        } else if (!iti.isValidNumber()) {
+          errors.phone = 'Invalid phone number';
+        }
+        return errors;
+      }}
+      onSubmit={(values, { setSubmitting }) => {
+        setTimeout(() => {
+          alert(JSON.stringify(values, null, 2));
+          navigate('/thank-you');
+          setSubmitting(false);
+        }, 400);
+      }}
+    >
+      {({ isSubmitting }) => (
+        <Form>
+          <label>
+            Full Name:
+            <Field type="text" name="fullname" id='fullname' placeholder="Full Name" />
+          </label>
+          <br />
+          <label>
+            Email:
+            <Field type="email" name="email" id='email' placeholder="Email" />
+          </label>
+          <br />
+          <label>
+            Phone:
+            <Field type="tel" name="phone" id='phone' placeholder="Phone" />
+          </label>
+          <br />
+          <button type="submit" disabled={isSubmitting}>
+            Submit
+          </button>
+        </Form>
+      )}
     </Formik>
   );
 };
